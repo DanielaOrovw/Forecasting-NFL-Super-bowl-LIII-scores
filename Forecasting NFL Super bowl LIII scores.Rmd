@@ -1,0 +1,151 @@
+---
+title: "Untitled"
+author: "Daniela"
+date: "February 1, 2019"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+library(plyr)
+library(dplyr)
+library(skellam)
+library(purrr)
+library(tidyr)
+library(RCurl)
+library(reshape2)
+library(data.table)
+require(corrplot, quietly=TRUE)
+library(ROCR)
+require(ggplot2, quietly=TRUE)
+library(ltm)
+library(gclus)
+library(odds.converter)
+library(caret)
+library(rpart)
+library(e1071)
+library(randomForest)
+library(gbm)
+library(nnet)
+library(MASS)
+#### Step 1: Import Data.
+setwd("C:/Users/Daniela Orovwiroro/Downloads")
+NFL_DATA= read.csv("NFL 2018 Season Data.csv",header = TRUE)
+
+## Examine the imported data, the descriptive statitics of the data
+str(NFL_DATA)
+summary(NFL_DATA)
+
+```
+```{r pressure, echo=FALSE}
+#We check to see if there are missing values.
+sapply(NFL_DATA, function(x) sum(is.na(x)))
+NFL_DATA = na.omit(NFL_DATA)
+#feature engineering of variables
+NFL_DATA$Passing_yards= NFL_DATA$Team_Passing+NFL_DATA$Opponent_Passing
+NFL_DATA$Rushing_yards= NFL_DATA$Team_Rushing+NFL_DATA$Opponent_Rushing
+NFL_DATA$ratio_of_teampassing=NFL_DATA$Team_Passing/NFL_DATA$Passing_yards
+NFL_DATA$ratio_of_teamrushing= NFL_DATA$Team_Rushing/NFL_DATA$Rushing_yards
+NFL_DATA$total_turnovers = NFL_DATA$Team_Turnovers+NFL_DATA$Opponent_Turnovers
+NFL_DATA$ratio_of_teamturnovers = NFL_DATA$Team_Turnovers/NFL_DATA$total_turnovers
+NFL_DATA$Total_score = NFL_DATA$Team_Score+NFL_DATA$Opponent_Score
+NFL_DATA$team_score_ratio = NFL_DATA$Team_Score/NFL_DATA$Total_score
+#We will create a new column based on the assumption of `Home` advantage is significant in determining the winner.
+NFL_DATA$home[NFL_DATA$Game.Location=="HOME"]=1
+NFL_DATA$home[NFL_DATA$Game.Location=="AWAY"]=0
+NFL_DATA$Goal_diff = NFL_DATA$Team_Score- NFL_DATA$Opponent_Score
+NFL_DATA$Team_wins_or_not=  ifelse(NFL_DATA$Goal_diff >0,"Win",
+                                   ifelse(NFL_DATA$Goal_diff <0,"Lose","Draw"))
+head(NFL_DATA)
+```
+```{r}
+#2. Data exploration and preprocessing
+# We check the correlation of the data column
+NFL_DATA_num = NFL_DATA[ , c(3,5:22)]
+NFL_DATA.cor = cor(NFL_DATA_num,use="pairwise", method="pearson")
+# Order the correlations by their strength.
+ord = order(NFL_DATA.cor[1,])
+NFL_DATA.cor =NFL_DATA.cor[ord, ord]
+corrplot(NFL_DATA.cor, mar=c(0,0,1,0))
+NFL_DATA.cor
+rcor.test(NFL_DATA_num, method = "pearson")
+
+# heat map correlation
+title = "Heat map correlation" 
+NFL_heatmap_corr = qplot(x=Var1, y=Var2, data=melt(cor(NFL_DATA_num, use="p")), fill=value, geom="tile") + scale_fill_gradient2(limits=c(-1, 1))
+NFL_heatmap_corr = NFL_heatmap_corr + theme(axis.title.x=element_blank(), axis.text.x=element_blank(), axis.ticks=element_blank())
+NFL_heatmap_corr = NFL_heatmap_corr + ggtitle(title)  
+NFL_heatmap_corr  
+
+#preprocessing of predictors
+pred = preProcess(NFL_DATA, method = c("center", "scale", "BoxCox"))
+NFL_DATA1 = predict(pred, NFL_DATA)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{r}
+#### Step 3: Prepare Training and Test Datasets.
+## 80/20 split
+#convert the variables in model_data to factors
+tr = sample(nrow(NFL_DATA), round(nrow(NFL_DATA) * 0.8))
+train = NFL_DATA[tr, ]
+test = NFL_DATA[-tr, ]
+
+```
+```{r}
+#### Step 4 Choose and apply a learning algorithm 
+#1. naive bayes model
+start.time = Sys.time() 
+set.seed(1200)
+NFL_nb = naiveBayes(Team_wins_or_not ~ ., data = train, laplace = 3)
+NFL_nb
+end.time = Sys.time()
+time.taken4 = end.time - start.time 
+# naive bayes.
+nb_pr = predict(NFL_nb, newdata=test)
+nb_pr
+nbcm = confusionMatrix(nb_pr, test$Team_wins_or_not)
+nbcm
+#View(data.frame(cbind(as.matrix(nb_pr))[,1], as.matrix(liga_test$FTR))) #important.
+overallnb = nbcm$overall
+overallnb
+```
+```{r}
+#2. Poisson model
+# Data formated for the independent model
+# Store in new variable, we need the data in original format later
+NFL.indep = data.frame(Team=as.factor(c(as.character(NFL_DATA$Team),
+                            as.character(NFL_DATA$Opponent))),
+                            Opponent=as.factor(c(as.character(NFL_DATA$Opponent),
+                            as.character(NFL_DATA$Team))),
+                            Goals=c(NFL_DATA$Team_Score, NFL_DATA$Opponent_Score),
+                            Home=c(rep(1, dim(NFL_DATA)[1]), rep(0, dim(NFL_DATA)[1])))
+
+model = glm(Goals ~ Home + Team + Opponent, data=NFL.indep, family=poisson())
+
+summary(model)
+```
+```{r}
+
+# Expected Team score
+Team_score = predict(model, data.frame(Home=1, Team='Los Angeles Rams', Opponent='New England Patriots'), type='response')
+paste("The expected score for Los Angeles Rams is", ceiling(Team_score) )
+
+# Expected opponent
+opponent_score = predict(model, data.frame(Home=0, Team='New England Patriots', Opponent='Los Angeles Rams'), type='response')
+paste("The expected score for New England Patriots is", ceiling(opponent_score) )
+
+ 
+```
+
