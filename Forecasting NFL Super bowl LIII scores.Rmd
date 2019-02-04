@@ -1,46 +1,21 @@
----
-title: "Untitled"
-author: "Daniela"
-date: "February 1, 2019"
-output:
-  html_document: default
-  pdf_document: default
----
-
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
-
-## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
 
 ```{r cars}
 library(plyr)
 library(dplyr)
-library(skellam)
 library(purrr)
 library(tidyr)
 library(RCurl)
 library(reshape2)
 library(data.table)
-require(corrplot, quietly=TRUE)
+library(corrplot)
 library(ROCR)
-require(ggplot2, quietly=TRUE)
-library(ltm)
-library(gclus)
-library(odds.converter)
 library(caret)
 library(rpart)
 library(e1071)
 library(randomForest)
 library(gbm)
-library(nnet)
-library(MASS)
+
 #### Step 1: Import Data.
-setwd("C:/Users/Daniela Orovwiroro/Downloads")
 NFL_DATA= read.csv("NFL 2018 Season Data.csv",header = TRUE)
 
 ## Examine the imported data, the descriptive statitics of the data
