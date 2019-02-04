@@ -63,9 +63,6 @@ NFL_heatmap_corr = NFL_heatmap_corr + theme(axis.title.x=element_blank(), axis.t
 NFL_heatmap_corr = NFL_heatmap_corr + ggtitle(title)  
 NFL_heatmap_corr  
 
-#preprocessing of predictors
-pred = preProcess(NFL_DATA, method = c("center", "scale", "BoxCox"))
-NFL_DATA1 = predict(pred, NFL_DATA)
 ```
 
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
